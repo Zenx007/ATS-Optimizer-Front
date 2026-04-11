@@ -1,0 +1,163 @@
+:root {
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  color: #0f172a;
+  background-color: #f1f5f9;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+}
+
+.page {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 24px;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px;
+}
+
+.card {
+  background: #ffffff;
+  border-radius: 14px;
+  padding: 20px;
+  box-shadow: 0 10px 30px rgba(15, 23, 42, 0.08);
+}
+
+h1 {
+  margin-top: 0;
+  margin-bottom: 8px;
+}
+
+h2 {
+  margin-top: 0;
+}
+
+.subtitle {
+  margin-top: 0;
+  color: #334155;
+}
+
+.upload-form {
+  display: grid;
+  gap: 10px;
+  margin-bottom: 14px;
+}
+
+label {
+  display: block;
+  margin-bottom: 6px;
+  font-weight: 600;
+}
+
+input[type='file'],
+textarea,
+button,
+.download {
+  width: 100%;
+}
+
+textarea {
+  resize: vertical;
+  border-radius: 10px;
+  border: 1px solid #cbd5e1;
+  padding: 10px;
+  font: inherit;
+  margin-bottom: 12px;
+}
+
+button,
+.download {
+  border: none;
+  border-radius: 10px;
+  background-color: #0f172a;
+  color: #fff;
+  padding: 12px 14px;
+  cursor: pointer;
+  font-weight: 600;
+  text-align: center;
+  text-decoration: none;
+}
+
+button:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.optimize {
+  margin-top: 4px;
+}
+
+.status {
+  margin-top: 0;
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: #e2e8f0;
+}
+
+.message {
+  margin: 14px 0 0;
+  padding: 10px 12px;
+  border-radius: 8px;
+}
+
+.message.error {
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+.message.success {
+  background: #dcfce7;
+  color: #166534;
+}
+
+.download {
+  margin-top: 14px;
+  display: inline-block;
+}
+
+.preview-card {
+  display: flex;
+  flex-direction: column;
+}
+
+.preview {
+  width: 100%;
+  min-height: 640px;
+  border-radius: 10px;
+  border: 1px solid #e2e8f0;
+  background: #fff;
+}
+
+.empty {
+  color: #475569;
+}
+
+details {
+  margin-top: 12px;
+}
+
+pre {
+  max-height: 220px;
+  overflow: auto;
+  background: #0f172a;
+  color: #f8fafc;
+  border-radius: 8px;
+  padding: 12px;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+@media (max-width: 960px) {
+  .page {
+    grid-template-columns: 1fr;
+  }
+
+  .preview {
+    min-height: 420px;
+  }
+}
