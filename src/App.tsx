@@ -19,6 +19,33 @@ type GeneratePdfResponse = {
 const API_BASE_URL =
   import.meta.env.VITE_API_BASE_URL?.replace(/\/$/, '') || 'http://localhost:3000';
 
+const fallbackCopyToClipboard = (value: string): boolean => {
+  const textArea = document.createElement('textarea');
+  textArea.value = value;
+  textArea.setAttribute('readonly', '');
+  textArea.style.position = 'fixed';
+  textArea.style.top = '-9999px';
+  textArea.style.left = '-9999px';
+  document.body.appendChild(textArea);
+
+  const selection = document.getSelection();
+  const selectedRange = selection && selection.rangeCount > 0 ? selection.getRangeAt(0) : null;
+
+  textArea.focus();
+  textArea.select();
+  textArea.setSelectionRange(0, textArea.value.length);
+
+  const copied = document.execCommand('copy');
+  document.body.removeChild(textArea);
+
+  if (selection && selectedRange) {
+    selection.removeAllRanges();
+    selection.addRange(selectedRange);
+  }
+
+  return copied;
+};
+
 function App() {
   const [file, setFile] = useState<File | null>(null);
   const [resumeId, setResumeId] = useState<string>('');
@@ -150,10 +177,21 @@ function App() {
     }
 
     try {
-      await navigator.clipboard.writeText(optimizedHtml);
+      if (navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(optimizedHtml);
+        setCopyMessage('HTML otimizado copiado para a área de transferência.');
+        setCopyMessageType('success');
+        return;
+      }
+    } catch {
+      // Fallback abaixo.
+    }
+
+    const copiedWithFallback = fallbackCopyToClipboard(optimizedHtml);
+    if (copiedWithFallback) {
       setCopyMessage('HTML otimizado copiado para a área de transferência.');
       setCopyMessageType('success');
-    } catch {
+    } else {
       setCopyMessage('Não foi possível copiar automaticamente. Tente novamente.');
       setCopyMessageType('error');
     }
