@@ -32,6 +32,8 @@ function App() {
   const [isOptimizing, setIsOptimizing] = useState<boolean>(false);
   const [errorMessage, setErrorMessage] = useState<string>('');
   const [successMessage, setSuccessMessage] = useState<string>('');
+  const [copyMessage, setCopyMessage] = useState<string>('');
+  const [copyMessageType, setCopyMessageType] = useState<'success' | 'error'>('success');
 
   const canOptimize = useMemo(() => {
     return Boolean(resumeId && jobDescription.trim() && immutableData.trim() && !isOptimizing);
@@ -137,6 +139,26 @@ function App() {
     }
   };
 
+  const handleCopyOptimizedHtml = async () => {
+    setCopyMessage('');
+    setCopyMessageType('success');
+
+    if (!optimizedHtml.trim()) {
+      setCopyMessage('Nenhum HTML otimizado disponível para copiar.');
+      setCopyMessageType('error');
+      return;
+    }
+
+    try {
+      await navigator.clipboard.writeText(optimizedHtml);
+      setCopyMessage('HTML otimizado copiado para a área de transferência.');
+      setCopyMessageType('success');
+    } catch {
+      setCopyMessage('Não foi possível copiar automaticamente. Tente novamente.');
+      setCopyMessageType('error');
+    }
+  };
+
   return (
     <main className="page">
       <section className="card">
@@ -199,6 +221,11 @@ function App() {
 
       <section className="card preview-card">
         <h2>Preview HTML otimizado</h2>
+        <button type="button" onClick={handleCopyOptimizedHtml} disabled={!optimizedHtml.trim()}>
+          Copiar HTML otimizado
+        </button>
+        {copyMessage && <p className={`message ${copyMessageType}`}>{copyMessage}</p>}
+
         {optimizedHtml ? (
           <iframe title="Preview do currículo otimizado" srcDoc={optimizedHtml} className="preview" />
         ) : (
