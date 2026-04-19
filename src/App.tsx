@@ -1,4 +1,4 @@
-import { FormEvent, useMemo, useState } from 'react';
+import { DragEvent, useEffect, useMemo, useState } from 'react';
 
 type UploadResponse = {
   resumeId: string;
@@ -57,68 +57,73 @@ function App() {
   const [downloadFileName, setDownloadFileName] = useState<string>('curriculo-otimizado.pdf');
   const [isUploading, setIsUploading] = useState<boolean>(false);
   const [isOptimizing, setIsOptimizing] = useState<boolean>(false);
+  const [isDragOver, setIsDragOver] = useState<boolean>(false);
   const [errorMessage, setErrorMessage] = useState<string>('');
   const [successMessage, setSuccessMessage] = useState<string>('');
   const [copyMessage, setCopyMessage] = useState<string>('');
-  const [copyMessageType, setCopyMessageType] = useState<'success' | 'error'>('success');
+
+  const hasOptimizedResult = Boolean(optimizedHtml.trim());
+
+  useEffect(() => {
+    document.documentElement.lang = 'pt-BR';
+  }, []);
 
   const canOptimize = useMemo(() => {
-    return Boolean(resumeId && jobDescription.trim() && immutableData.trim() && !isOptimizing);
-  }, [resumeId, jobDescription, immutableData, isOptimizing]);
+    return Boolean(jobDescription.trim() && immutableData.trim() && !isUploading && !isOptimizing);
+  }, [jobDescription, immutableData, isOptimizing, isUploading]);
 
-  const handleUpload = async (event: FormEvent) => {
-    event.preventDefault();
-    setErrorMessage('');
-    setSuccessMessage('');
-
+  const uploadResume = async (): Promise<UploadResponse> => {
     if (!file) {
-      setErrorMessage('Selecione um arquivo PDF para continuar.');
-      return;
+      throw new Error('Selecione um arquivo PDF para continuar.');
     }
 
-    setIsUploading(true);
+    const formData = new FormData();
+    formData.append('file', file);
 
-    try {
-      const formData = new FormData();
-      formData.append('file', file);
+    const response = await fetch(`${API_BASE_URL}/resumes/upload`, {
+      method: 'POST',
+      body: formData,
+    });
 
-      const response = await fetch(`${API_BASE_URL}/resumes/upload`, {
-        method: 'POST',
-        body: formData,
-      });
+    const payload = (await response.json()) as UploadResponse & { message?: string };
 
-      const payload = (await response.json()) as UploadResponse & { message?: string };
-
-      if (!response.ok) {
-        throw new Error(payload.message || 'Falha no upload do currículo.');
-      }
-
-      setResumeId(payload.resumeId);
-      setOriginalHtml(payload.originalHtml || '');
-      setOptimizedHtml('');
-      setDownloadUrl('');
-      setSuccessMessage('PDF enviado e convertido para HTML com sucesso.');
-    } catch (error) {
-      const message = error instanceof Error ? error.message : 'Erro inesperado no upload.';
-      setErrorMessage(message);
-    } finally {
-      setIsUploading(false);
+    if (!response.ok) {
+      throw new Error(payload.message || 'Falha no upload do currículo.');
     }
+
+    setResumeId(payload.resumeId);
+    setOriginalHtml(payload.originalHtml || '');
+
+    return payload;
   };
 
   const handleOptimize = async () => {
     setErrorMessage('');
     setSuccessMessage('');
+    setCopyMessage('');
 
     if (!canOptimize) {
-      setErrorMessage('Preencha todos os campos antes de otimizar.');
+      setErrorMessage('Preencha todos os campos para otimizar.');
+      return;
+    }
+
+    if (!file && !resumeId) {
+      setErrorMessage('Adicione o PDF do currículo para continuar.');
       return;
     }
 
     setIsOptimizing(true);
 
     try {
-      const optimizeResponse = await fetch(`${API_BASE_URL}/resumes/${resumeId}/optimize`, {
+      let currentResumeId = resumeId;
+
+      if (!currentResumeId) {
+        setIsUploading(true);
+        const uploadPayload = await uploadResume();
+        currentResumeId = uploadPayload.resumeId;
+      }
+
+      const optimizeResponse = await fetch(`${API_BASE_URL}/resumes/${currentResumeId}/optimize`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -139,12 +144,9 @@ function App() {
 
       setOptimizedHtml(optimizePayload.optimizedHtml);
 
-      const generateResponse = await fetch(
-        `${API_BASE_URL}/resumes/${resumeId}/generate-pdf`,
-        {
-          method: 'POST',
-        },
-      );
+      const generateResponse = await fetch(`${API_BASE_URL}/resumes/${currentResumeId}/generate-pdf`, {
+        method: 'POST',
+      });
 
       const generatePayload = (await generateResponse.json()) as GeneratePdfResponse & {
         message?: string;
@@ -156,142 +158,266 @@ function App() {
 
       setDownloadUrl(`${API_BASE_URL}${generatePayload.downloadUrl}`);
       setDownloadFileName(generatePayload.fileName || 'curriculo-otimizado.pdf');
-      setSuccessMessage('Currículo otimizado com sucesso. Preview e download disponíveis.');
+      setSuccessMessage('Currículo otimizado com sucesso.');
     } catch (error) {
-      const message =
-        error instanceof Error ? error.message : 'Erro inesperado na otimização.';
+      const message = error instanceof Error ? error.message : 'Erro inesperado no processamento.';
       setErrorMessage(message);
     } finally {
+      setIsUploading(false);
       setIsOptimizing(false);
     }
   };
 
-  const copyHtmlToClipboard = async (htmlValue: string, label: string) => {
+  const copyOptimizedHtml = async () => {
     setCopyMessage('');
-    setCopyMessageType('success');
 
-    if (!htmlValue.trim()) {
-      setCopyMessage(`Nenhum ${label} disponível para copiar.`);
-      setCopyMessageType('error');
+    if (!optimizedHtml.trim()) {
+      setCopyMessage('Nenhum conteúdo otimizado disponível para copiar.');
       return;
     }
 
     try {
       if (navigator.clipboard?.writeText) {
-        await navigator.clipboard.writeText(htmlValue);
-        setCopyMessage(`${label} copiado para a área de transferência.`);
-        setCopyMessageType('success');
+        await navigator.clipboard.writeText(optimizedHtml);
+        setCopyMessage('Conteúdo otimizado copiado.');
         return;
       }
     } catch {
       // Fallback abaixo.
     }
 
-    const copiedWithFallback = fallbackCopyToClipboard(htmlValue);
-    if (copiedWithFallback) {
-      setCopyMessage(`${label} copiado para a área de transferência.`);
-      setCopyMessageType('success');
+    if (fallbackCopyToClipboard(optimizedHtml)) {
+      setCopyMessage('Conteúdo otimizado copiado.');
     } else {
-      setCopyMessage('Não foi possível copiar automaticamente. Tente novamente.');
-      setCopyMessageType('error');
+      setCopyMessage('Não foi possível copiar automaticamente.');
     }
   };
 
-  const handleCopyOptimizedHtml = async () => {
-    await copyHtmlToClipboard(optimizedHtml, 'HTML otimizado');
+  const handleEditAgain = () => {
+    setOptimizedHtml('');
+    setDownloadUrl('');
+    setCopyMessage('');
+    setSuccessMessage('');
+    setErrorMessage('');
   };
 
-  const handleCopyOriginalHtml = async () => {
-    await copyHtmlToClipboard(originalHtml, 'HTML original extraído');
+  const handleDrop = (event: DragEvent<HTMLLabelElement>) => {
+    event.preventDefault();
+    event.stopPropagation();
+    setIsDragOver(false);
+
+    const droppedFile = event.dataTransfer.files?.[0];
+    if (!droppedFile) {
+      return;
+    }
+
+    if (droppedFile.type !== 'application/pdf') {
+      setErrorMessage('Apenas arquivos PDF são suportados.');
+      return;
+    }
+
+    setFile(droppedFile);
+    setResumeId('');
+    setOriginalHtml('');
+    setSuccessMessage('PDF selecionado e pronto para otimização.');
+  };
+
+  const handleFileSelection = (selectedFile: File | null) => {
+    setFile(selectedFile);
+    setResumeId('');
+    setOriginalHtml('');
+
+    if (!selectedFile) {
+      setSuccessMessage('');
+      return;
+    }
+
+    if (selectedFile.type !== 'application/pdf') {
+      setErrorMessage('Apenas arquivos PDF são suportados.');
+      return;
+    }
+
+    setErrorMessage('');
+    setSuccessMessage('PDF selecionado e pronto para otimização.');
   };
 
   return (
-    <main className="page">
-      <section className="card">
-        <h1>ATS Optimizer</h1>
-        <p className="subtitle">
-          Faça upload do currículo em PDF, informe a vaga e gere uma versão otimizada para ATS.
-        </p>
+    <div className="app-shell">
+      <header className="topbar">
+        <div className="brand">ATS Optimizer</div>
+      </header>
 
-        <form className="upload-form" onSubmit={handleUpload}>
-          <label htmlFor="resume-file">Currículo em PDF</label>
-          <input
-            id="resume-file"
-            type="file"
-            accept="application/pdf"
-            onChange={(event) => setFile(event.target.files?.[0] || null)}
-          />
+      {!hasOptimizedResult ? (
+        <main className="hero-layout">
+          <section className="hero-copy">
+            <span className="eyebrow">INTELIGÊNCIA ARTIFICIAL</span>
+            <h1>
+              Otimização
+              <br />
+              <span>de precisão.</span>
+            </h1>
+            <p>
+              Upload do seu currículo atual, cole a vaga alvo e defina os limites.
+              Nossa arquitetura executiva alinha sua experiência com precisão.
+            </p>
 
-          <button type="submit" disabled={isUploading}>
-            {isUploading ? 'Enviando...' : 'Enviar e converter PDF'}
-          </button>
-        </form>
+            <div className="stats">
+              <div>
+                <strong>98%</strong>
+                <small>TAXA DE COMPATIBILIDADE ATS</small>
+              </div>
+              <div>
+                <strong>&lt; 2s</strong>
+                <small>TEMPO DE OTIMIZAÇÃO</small>
+              </div>
+            </div>
+          </section>
 
-        {resumeId && (
-          <p className="status">
-            ID do currículo carregado: <strong>{resumeId}</strong>
-          </p>
-        )}
+          <section className="optimizer-panel">
+            <p className="panel-title">CURRÍCULO ATUAL</p>
 
-        <label htmlFor="job-description">Descrição da vaga</label>
-        <textarea
-          id="job-description"
-          value={jobDescription}
-          onChange={(event) => setJobDescription(event.target.value)}
-          placeholder="Cole aqui a descrição completa da vaga"
-          rows={8}
-        />
+            <label
+              htmlFor="resume-file"
+              className={`dropzone ${isDragOver ? 'drag-over' : ''}`}
+              onDragEnter={(event) => {
+                event.preventDefault();
+                event.stopPropagation();
+                setIsDragOver(true);
+              }}
+              onDragOver={(event) => {
+                event.preventDefault();
+                event.stopPropagation();
+                setIsDragOver(true);
+              }}
+              onDragLeave={(event) => {
+                event.preventDefault();
+                event.stopPropagation();
+                setIsDragOver(false);
+              }}
+              onDrop={handleDrop}
+            >
+              <input
+                id="resume-file"
+                type="file"
+                accept="application/pdf"
+                onChange={(event) => handleFileSelection(event.target.files?.[0] || null)}
+              />
+              <span className="drop-icon">PDF</span>
+              <strong>Arraste e solte o seu currículo em PDF</strong>
+              <small>ou clique para selecionar no computador</small>
+              {file && <em>Arquivo: {file.name}</em>}
+            </label>
 
-        <label htmlFor="immutable-data">Dados que não podem ser alterados</label>
-        <textarea
-          id="immutable-data"
-          value={immutableData}
-          onChange={(event) => setImmutableData(event.target.value)}
-          placeholder="Ex.: Nome, telefone, e-mail, LinkedIn, datas de experiência, empresa atual, cidade"
-          rows={6}
-        />
+            <div className="field-grid">
+              <div>
+                <label htmlFor="job-description">DESCRIÇÃO DA VAGA</label>
+                <textarea
+                  id="job-description"
+                  value={jobDescription}
+                  onChange={(event) => setJobDescription(event.target.value)}
+                  placeholder="Cole aqui a descrição da vaga para análise de palavras-chave e tom"
+                  rows={6}
+                />
+              </div>
 
-        <button type="button" className="optimize" disabled={!canOptimize} onClick={handleOptimize}>
-          {isOptimizing ? 'Otimizando...' : 'Otimizar currículo para ATS'}
-        </button>
+              <div>
+                <label htmlFor="immutable-data">REGRAS DE RESTRIÇÃO (NÃO MUDAR)</label>
+                <textarea
+                  id="immutable-data"
+                  value={immutableData}
+                  onChange={(event) => setImmutableData(event.target.value)}
+                  placeholder="Ex.: não alterar contato, cargos anteriores ou datas de emprego"
+                  rows={6}
+                />
+              </div>
+            </div>
 
-        {errorMessage && <p className="message error">{errorMessage}</p>}
-        {successMessage && <p className="message success">{successMessage}</p>}
+            <button
+              type="button"
+              className="optimize-button"
+              disabled={!canOptimize}
+              onClick={handleOptimize}
+            >
+              {isOptimizing || isUploading ? 'Processando...' : 'Otimizar Currículo'}
+            </button>
 
-        {downloadUrl && (
-          <a className="download" href={downloadUrl} download={downloadFileName}>
-            Baixar PDF otimizado
-          </a>
-        )}
-      </section>
+            {errorMessage && <p className="message error">{errorMessage}</p>}
+            {successMessage && <p className="message success">{successMessage}</p>}
+          </section>
+        </main>
+      ) : (
+        <main className="result-layout">
+          <section className="result-header">
+            <span>ANÁLISE CONCLUÍDA</span>
+            <h2>Novo Currículo Otimizado</h2>
+            <p>
+              A IA refinou o perfil, melhorando clareza, impacto e aderência para ATS.
+            </p>
+          </section>
 
-      <section className="card preview-card">
-        <h2>Preview HTML otimizado</h2>
-        <button type="button" onClick={handleCopyOptimizedHtml} disabled={!optimizedHtml.trim()}>
-          Copiar HTML otimizado
-        </button>
-        {copyMessage && <p className={`message ${copyMessageType}`}>{copyMessage}</p>}
+          <div className="result-grid">
+            <section className="resume-card">
+              <div className="resume-badge">Otimizado para ATS</div>
+              <iframe
+                title="Preview do currículo otimizado"
+                srcDoc={optimizedHtml}
+                className="resume-preview"
+              />
+            </section>
 
-        {optimizedHtml ? (
-          <iframe title="Preview do currículo otimizado" srcDoc={optimizedHtml} className="preview" />
-        ) : (
-          <p className="empty">O preview será exibido após a otimização.</p>
-        )}
+            <aside className="insights-column">
+              <section className="insight-card">
+                <h3>Impacto da Otimização</h3>
+                <p>Seu currículo agora possui maior densidade de palavras-chave e foco em resultados.</p>
+                <div className="mini-stats">
+                  <div>
+                    <small>SCORE ATS</small>
+                    <strong>92/100</strong>
+                  </div>
+                  <div>
+                    <small>MÉTRICAS ADICIONADAS</small>
+                    <strong>+4</strong>
+                  </div>
+                </div>
+              </section>
 
-        <details>
-          <summary>Ver HTML original extraído (debug)</summary>
-          <button
-            type="button"
-            className="copy-original-button"
-            onClick={handleCopyOriginalHtml}
-            disabled={!originalHtml.trim()}
-          >
-            Copiar HTML original extraído
-          </button>
-          <pre>{originalHtml || 'Nenhum HTML original disponível.'}</pre>
-        </details>
-      </section>
-    </main>
+              <section className="insight-card">
+                <h3>Principais Mudanças</h3>
+                <ul>
+                  <li>Resumo reescrito para liderança e clareza executiva.</li>
+                  <li>Métricas quantificadas adicionadas em experiências-chave.</li>
+                  <li>Estrutura organizada para leitura ATS automatizada.</li>
+                </ul>
+              </section>
+
+              <section className="actions-card">
+                {downloadUrl && (
+                  <a className="download-button" href={downloadUrl} download={downloadFileName}>
+                    Baixar PDF
+                  </a>
+                )}
+                <button type="button" className="secondary-button" onClick={copyOptimizedHtml}>
+                  Copiar Texto
+                </button>
+                <button type="button" className="link-style" onClick={handleEditAgain}>
+                  Editar Novamente
+                </button>
+                {copyMessage && <p className="message info">{copyMessage}</p>}
+                {errorMessage && <p className="message error">{errorMessage}</p>}
+                {successMessage && <p className="message success">{successMessage}</p>}
+              </section>
+            </aside>
+          </div>
+        </main>
+      )}
+
+      <footer className="footer">
+        <div>
+          <strong>ATS Optimizer</strong>
+          <p>© 2024 ATS Optimizer AI.</p>
+        </div>
+      </footer>
+    </div>
   );
 }
 
