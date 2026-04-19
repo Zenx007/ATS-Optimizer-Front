@@ -166,20 +166,20 @@ function App() {
     }
   };
 
-  const handleCopyOptimizedHtml = async () => {
+  const copyHtmlToClipboard = async (htmlValue: string, label: string) => {
     setCopyMessage('');
     setCopyMessageType('success');
 
-    if (!optimizedHtml.trim()) {
-      setCopyMessage('Nenhum HTML otimizado disponível para copiar.');
+    if (!htmlValue.trim()) {
+      setCopyMessage(`Nenhum ${label} disponível para copiar.`);
       setCopyMessageType('error');
       return;
     }
 
     try {
       if (navigator.clipboard?.writeText) {
-        await navigator.clipboard.writeText(optimizedHtml);
-        setCopyMessage('HTML otimizado copiado para a área de transferência.');
+        await navigator.clipboard.writeText(htmlValue);
+        setCopyMessage(`${label} copiado para a área de transferência.`);
         setCopyMessageType('success');
         return;
       }
@@ -187,14 +187,22 @@ function App() {
       // Fallback abaixo.
     }
 
-    const copiedWithFallback = fallbackCopyToClipboard(optimizedHtml);
+    const copiedWithFallback = fallbackCopyToClipboard(htmlValue);
     if (copiedWithFallback) {
-      setCopyMessage('HTML otimizado copiado para a área de transferência.');
+      setCopyMessage(`${label} copiado para a área de transferência.`);
       setCopyMessageType('success');
     } else {
       setCopyMessage('Não foi possível copiar automaticamente. Tente novamente.');
       setCopyMessageType('error');
     }
+  };
+
+  const handleCopyOptimizedHtml = async () => {
+    await copyHtmlToClipboard(optimizedHtml, 'HTML otimizado');
+  };
+
+  const handleCopyOriginalHtml = async () => {
+    await copyHtmlToClipboard(originalHtml, 'HTML original extraído');
   };
 
   return (
@@ -272,6 +280,14 @@ function App() {
 
         <details>
           <summary>Ver HTML original extraído (debug)</summary>
+          <button
+            type="button"
+            className="copy-original-button"
+            onClick={handleCopyOriginalHtml}
+            disabled={!originalHtml.trim()}
+          >
+            Copiar HTML original extraído
+          </button>
           <pre>{originalHtml || 'Nenhum HTML original disponível.'}</pre>
         </details>
       </section>

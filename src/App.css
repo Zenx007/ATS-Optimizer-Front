@@ -141,6 +141,11 @@ details {
   margin-top: 12px;
 }
 
+.copy-original-button {
+  margin-top: 10px;
+  margin-bottom: 10px;
+}
+
 pre {
   max-height: 220px;
   overflow: auto;
