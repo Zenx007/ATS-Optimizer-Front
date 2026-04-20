@@ -72,13 +72,13 @@ function App() {
     return Boolean(jobDescription.trim() && immutableData.trim() && !isUploading && !isOptimizing);
   }, [jobDescription, immutableData, isOptimizing, isUploading]);
 
-  const uploadResume = async (): Promise<UploadResponse> => {
-    if (!file) {
+  const uploadResume = async (resumeFile: File): Promise<UploadResponse> => {
+    if (!resumeFile) {
       throw new Error('Selecione um arquivo PDF para continuar.');
     }
 
     const formData = new FormData();
-    formData.append('file', file);
+    formData.append('file', resumeFile);
 
     const response = await fetch(`${API_BASE_URL}/resumes/upload`, {
       method: 'POST',
@@ -118,8 +118,12 @@ function App() {
       let currentResumeId = resumeId;
 
       if (!currentResumeId) {
+        if (!file) {
+          throw new Error('Adicione o PDF do currículo para continuar.');
+        }
+
         setIsUploading(true);
-        const uploadPayload = await uploadResume();
+        const uploadPayload = await uploadResume(file);
         currentResumeId = uploadPayload.resumeId;
       }
 
@@ -193,6 +197,31 @@ function App() {
     }
   };
 
+  const copyOriginalHtml = async () => {
+    setCopyMessage('');
+
+    if (!originalHtml.trim()) {
+      setCopyMessage('Nenhum HTML original disponível para copiar.');
+      return;
+    }
+
+    try {
+      if (navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(originalHtml);
+        setCopyMessage('HTML original copiado.');
+        return;
+      }
+    } catch {
+      // Fallback abaixo.
+    }
+
+    if (fallbackCopyToClipboard(originalHtml)) {
+      setCopyMessage('HTML original copiado.');
+    } else {
+      setCopyMessage('Não foi possível copiar automaticamente.');
+    }
+  };
+
   const handleEditAgain = () => {
     setOptimizedHtml('');
     setDownloadUrl('');
@@ -201,7 +230,33 @@ function App() {
     setErrorMessage('');
   };
 
-  const handleDrop = (event: DragEvent<HTMLLabelElement>) => {
+  const processSelectedFile = async (selectedFile: File) => {
+    setFile(selectedFile);
+    setResumeId('');
+    setOriginalHtml('');
+    setCopyMessage('');
+    setErrorMessage('');
+    setSuccessMessage('');
+
+    if (selectedFile.type !== 'application/pdf') {
+      setErrorMessage('Apenas arquivos PDF são suportados.');
+      return;
+    }
+
+    setIsUploading(true);
+
+    try {
+      await uploadResume(selectedFile);
+      setSuccessMessage('PDF processado e HTML original disponível.');
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Erro inesperado no upload do PDF.';
+      setErrorMessage(message);
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
+  const handleDrop = async (event: DragEvent<HTMLLabelElement>) => {
     event.preventDefault();
     event.stopPropagation();
     setIsDragOver(false);
@@ -211,34 +266,21 @@ function App() {
       return;
     }
 
-    if (droppedFile.type !== 'application/pdf') {
-      setErrorMessage('Apenas arquivos PDF são suportados.');
-      return;
-    }
-
-    setFile(droppedFile);
-    setResumeId('');
-    setOriginalHtml('');
-    setSuccessMessage('PDF selecionado e pronto para otimização.');
+    await processSelectedFile(droppedFile);
   };
 
-  const handleFileSelection = (selectedFile: File | null) => {
-    setFile(selectedFile);
-    setResumeId('');
-    setOriginalHtml('');
+  const handleFileSelection = async (selectedFile: File | null) => {
+    setCopyMessage('');
 
     if (!selectedFile) {
+      setFile(null);
+      setResumeId('');
+      setOriginalHtml('');
       setSuccessMessage('');
       return;
     }
 
-    if (selectedFile.type !== 'application/pdf') {
-      setErrorMessage('Apenas arquivos PDF são suportados.');
-      return;
-    }
-
-    setErrorMessage('');
-    setSuccessMessage('PDF selecionado e pronto para otimização.');
+    await processSelectedFile(selectedFile);
   };
 
   return (
@@ -341,6 +383,17 @@ function App() {
               {isOptimizing || isUploading ? 'Processando...' : 'Otimizar Currículo'}
             </button>
 
+            {originalHtml.trim() && (
+              <button
+                type="button"
+                className="secondary-button"
+                onClick={copyOriginalHtml}
+                disabled={isUploading}
+              >
+                Copiar HTML Original
+              </button>
+            )}
+
             {errorMessage && <p className="message error">{errorMessage}</p>}
             {successMessage && <p className="message success">{successMessage}</p>}
           </section>
@@ -398,6 +451,14 @@ function App() {
                 )}
                 <button type="button" className="secondary-button" onClick={copyOptimizedHtml}>
                   Copiar Texto
+                </button>
+                <button
+                  type="button"
+                  className="secondary-button"
+                  onClick={copyOriginalHtml}
+                  disabled={!originalHtml.trim()}
+                >
+                  Copiar HTML Original
                 </button>
                 <button type="button" className="link-style" onClick={handleEditAgain}>
                   Editar Novamente
