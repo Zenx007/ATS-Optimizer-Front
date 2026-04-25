@@ -172,31 +172,6 @@ function App() {
     }
   };
 
-  const copyOptimizedHtml = async () => {
-    setCopyMessage('');
-
-    if (!optimizedHtml.trim()) {
-      setCopyMessage('Nenhum conteúdo otimizado disponível para copiar.');
-      return;
-    }
-
-    try {
-      if (navigator.clipboard?.writeText) {
-        await navigator.clipboard.writeText(optimizedHtml);
-        setCopyMessage('Conteúdo otimizado copiado.');
-        return;
-      }
-    } catch {
-      // Fallback abaixo.
-    }
-
-    if (fallbackCopyToClipboard(optimizedHtml)) {
-      setCopyMessage('Conteúdo otimizado copiado.');
-    } else {
-      setCopyMessage('Não foi possível copiar automaticamente.');
-    }
-  };
-
   const copyOriginalHtml = async () => {
     setCopyMessage('');
 
@@ -309,7 +284,7 @@ function App() {
                 <small>TAXA DE COMPATIBILIDADE ATS</small>
               </div>
               <div>
-                <strong>&lt; 2s</strong>
+                <strong>&lt; 10s</strong>
                 <small>TEMPO DE OTIMIZAÇÃO</small>
               </div>
             </div>
@@ -449,9 +424,6 @@ function App() {
                     Baixar PDF
                   </a>
                 )}
-                <button type="button" className="secondary-button" onClick={copyOptimizedHtml}>
-                  Copiar Texto
-                </button>
                 <button
                   type="button"
                   className="secondary-button"
@@ -475,7 +447,7 @@ function App() {
       <footer className="footer">
         <div>
           <strong>ATS Optimizer</strong>
-          <p>© 2024 ATS Optimizer AI.</p>
+          <p>© 2026 ATS Optimizer AI.</p>
         </div>
       </footer>
     </div>
