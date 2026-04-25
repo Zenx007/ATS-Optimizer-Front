@@ -17,7 +17,6 @@
   --info-bg: #1a2339;
   --info-text: #9db5ff;
   color: var(--text-primary);
-  background: radial-gradient(circle at top left, #1a1231 0%, var(--bg-main) 55%);
 }
 
 * {
@@ -25,15 +24,21 @@
 }
 
 html,
-body,
-#root {
+body {
   width: 100%;
   min-height: 100%;
+  background: radial-gradient(circle at top left, #1a1231 0%, var(--bg-main) 55%);
+  overscroll-behavior-y: none;
+}
+
+#root {
+  width: 100%;
+  min-height: 100vh;
 }
 
 body {
   margin: 0;
-  background: var(--bg-main);
+  background-color: var(--bg-main);
   color: var(--text-primary);
 }
 
@@ -46,7 +51,6 @@ a {
   width: 100%;
   display: flex;
   flex-direction: column;
-  background: radial-gradient(circle at top left, #1a1231 0%, var(--bg-main) 55%);
 }
 
 .topbar {
